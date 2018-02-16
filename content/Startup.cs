@@ -1,13 +1,17 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.SpaServices.Webpack;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Okta.Sdk;
+using Okta.Sdk.Configuration;
+using Vue2Spa.Services;
 
 namespace Vue2Spa
 {
@@ -20,6 +24,12 @@ namespace Vue2Spa
                 .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                 .AddJsonFile($"appsettings.{env.EnvironmentName}.json", optional: true)
                 .AddEnvironmentVariables();
+
+            if (env.IsDevelopment())
+            {
+                builder.AddUserSecrets<Startup>();
+            }
+            
             Configuration = builder.Build();
         }
 
@@ -30,6 +40,20 @@ namespace Vue2Spa
         {
             // Add framework services.
             services.AddMvc();
+            services.AddSingleton<ITodoItemService, OktaTodoItemService>();
+            services.AddSingleton<IOktaClient>(new OktaClient(new OktaClientConfiguration
+            {
+                OrgUrl = "https://dev-444675.oktapreview.com",
+                Token = Configuration["okta:token"]
+            }));
+            services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+                .AddJwtBearer(
+                    options =>
+                    {
+                        options.RequireHttpsMetadata = false;
+                        options.Authority = "https://dev-444675.oktapreview.com/oauth2/default";
+                        options.Audience = "api://default";
+                    });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
@@ -52,6 +76,7 @@ namespace Vue2Spa
             }
 
             app.UseStaticFiles();
+            app.UseAuthentication();
 
             app.UseMvc(routes =>
             {
